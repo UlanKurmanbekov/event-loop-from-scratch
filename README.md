@@ -46,7 +46,7 @@ The event loop orchestrates all tasks, using `select()` to efficiently wait for 
 
 ### Run the server:
 ```bash
-python server.py
+python event_loop.py
 ```
 
 ### Test with telnet:
