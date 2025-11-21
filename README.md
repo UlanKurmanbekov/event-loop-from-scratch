@@ -1,13 +1,13 @@
 # Event Loop From Scratch
 
-A minimalist implementation of an async event loop in Python using generators and `select()`. This project demonstrates the core concepts behind async I/O frameworks like `asyncio`
+A minimalist implementation of an async event loop in Python using generators and selectors. This project demonstrates the core concepts behind async I/O frameworks like `asyncio`.
 
 ## Purpose
 
 This is an **educational project** designed to illustrate:
 - How event loops work at a fundamental level
 - Cooperative multitasking with Python generators
-- I/O multiplexing with `select()` to avoid blocking
+- I/O multiplexing with selectors to avoid blocking
 - The basic architecture behind async frameworks
 
 **Note:** This is NOT production-ready code. Use `asyncio` or similar libraries for real applications
@@ -18,29 +18,32 @@ The implementation consists of three main components:
 
 ### 1. **Generator-based Tasks**
 ```python
-def server():
+def server(loop: 'EventLoop') -> Generator[tuple[EventType, socket.socket], None, None]:
+    # ...
     while True:
-        yield 'read', server_socket  # Suspend until socket is ready
+        yield EventType.READ, server_socket  # Suspend until socket is ready
         client_socket, addr = server_socket.accept()
         # ...
 ```
 
 Each task is a generator that yields control back to the event loop when it needs to wait for I/O
 
-### 2. **Event Loop**
+### 2. **Event Loop Class**
 ```python
-def event_loop():
-    while any([pending_tasks, sockets_waiting_for_read, sockets_waiting_for_write]):
-        # Use select() to wait for ready sockets
-        # Resume tasks when their sockets are ready
+class EventLoop:
+    def run(self):
+        while True:
+            while self.pending_tasks:
+                # Process all ready tasks
+            self._wait_for_io()  # Wait for I/O events
 ```
 
-The event loop orchestrates all tasks, using `select()` to efficiently wait for I/O operations
+The event loop orchestrates all tasks, using selectors to efficiently wait for I/O operations
 
 ### 3. **I/O Multiplexing**
-- Tasks waiting for readable sockets go into `sockets_waiting_for_read`
-- Tasks waiting for writable sockets go into `sockets_waiting_for_write`
-- `select()` monitors all sockets and returns which ones are ready
+- Tasks register their sockets with the selector
+- Selector monitors all sockets for readiness
+- When a socket is ready, its task is moved back to the pending queue
 
 ## Usage
 
@@ -71,23 +74,28 @@ telnet localhost 8000
 All connections are handled concurrently by a single thread
 
 ## Code Structure
-
 ```python
-pending_tasks = deque()                # Tasks ready to run
-sockets_waiting_for_read = {}          # Socket → Task mappings
-sockets_waiting_for_write = {}         # Socket → Task mappings
+class EventType(Enum):                 # READ/WRITE operations
+    READ = auto()
+    WRITE = auto()
 
-def server():                          # Accept connections
+def server(loop):                      # Accept connections
 def handle_client(client_socket):     # Handle client requests
-def event_loop():                      # Main event loop
+
+class EventLoop:                       # Main event loop
+    def create_task(...)               # Add task to queue
+    def _register_for_io(...)          # Register socket for I/O
+    def _wait_for_io(...)              # Wait for ready sockets
+    def run(...)                       # Run the loop
 ```
 
 ## Key Concepts Demonstrated
 
 1. **Cooperative Multitasking**: Tasks voluntarily yield control
-2. **I/O Multiplexing**: One thread handles multiple connections
+2. **I/O Multiplexing**: One thread handles multiple connections via selectors
 3. **Generator Coroutines**: Generators as primitive async functions
 4. **Event-Driven Architecture**: React to I/O readiness events
+5. **Type Safety**: Full type annotations for clarity
 
 ## Learn More
 
@@ -99,7 +107,7 @@ To understand what's happening under the hood of async frameworks, read:
 ## Limitations
 
 This is a teaching tool with deliberate simplifications:
-- No error handling for connection errors
+- Basic error handling (logs but continues)
 - No timeout handling
-- No graceful shutdown
-- Messages must be small enough to send in one send() call
+- No graceful shutdown mechanism
+- Messages must fit in a single recv()/send() call
